@@ -17,4 +17,4 @@ spec:
     spec:
       containers:
       - image: public.ecr.aws/b5w5t6c3/jenkinsecrpub:latest
-        name: mindtree
+        name: jenkinsecrpub
