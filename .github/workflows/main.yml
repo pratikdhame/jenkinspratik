@@ -1,0 +1,57 @@
+name: Build & Deploy Java App to Tomcat9 on EC2
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Build with Maven 3.9.6 (JDK 21) & Deploy to Tomcat9
+    runs-on: self-hosted     # 👈 runs directly on your EC2
+
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-21-openjdk-amd64
+      MAVEN_HOME: /opt/maven
+      TOMCAT_HOME: /opt/tomcat9
+      PATH: /opt/maven/bin:/usr/lib/jvm/java-21-openjdk-amd64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+    steps:
+      # 1️⃣ Checkout source code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2️⃣ Verify build tools
+      - name: Verify Java & Maven versions
+        run: |
+          echo "----- Java Version (Build) -----"
+          java -version
+          echo "----- Maven Version -----"
+          mvn -version
+
+      # 3️⃣ Build WAR with Maven 3.9.6 + JDK 21
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      # 4️⃣ Deploy WAR as ROOT to Tomcat9
+      - name: Deploy to Tomcat9
+        run: |
+          echo "🛑 Stopping Tomcat9..."
+          sudo systemctl stop tomcat9
+
+          echo "🧹 Cleaning old ROOT deployment..."
+          sudo rm -rf $TOMCAT_HOME/webapps/ROOT
+          sudo rm -f  $TOMCAT_HOME/webapps/ROOT.war
+
+          echo "📦 Deploying new WAR as ROOT..."
+          WAR_FILE=$(ls target/*.war | head -n 1)
+          sudo cp "$WAR_FILE" $TOMCAT_HOME/webapps/ROOT.war
+          sudo chown tomcat:tomcat $TOMCAT_HOME/webapps/ROOT.war
+
+          echo "▶️ Starting Tomcat9..."
+          sudo systemctl start tomcat9
+
+          sleep 5
+          echo "----- Tomcat9 Status -----"
+          sudo systemctl status tomcat9 --no-pager | head -n 15
+          echo "✅ Deployment successful! App live at http://<EC2_IP>:8080/"
